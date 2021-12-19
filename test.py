@@ -8,39 +8,30 @@ b = 0.1
 T = 10
 
 mem = Memory(k, n, p, b, T)
-mem.add_concept('Christos', 5)
+mem.add_concept('Christos', 1)
 stimulus = Stimulus(k, n, p, attribute='Project')
 print('stimulate Project')
 mem.stimulate_WM(stimulus, 10)
 stimulus = Stimulus(k, n, p, attribute='Christos')
 print('stimulate Christos')
-mem.stimulate_WM(stimulus, 10)
+mem.stimulate_WM(stimulus, 30)
 
 
 """
+1. assembly in Concept  <-> Area <-> Stimulus
+2. Area' <-> Stimulus
+3. assembly in Concept <-> Area'
+"""
+
+"""
 Test 1
-A stimulus presented consistently
-Expect readout to find the created concept 
-linked to the concepts presecribed by the stimulus
+A stimulus presented for t1
+Present the stimulus again
 """
 
 """
 Test 2
-A stimulus presented consistently
-Provide the stimulus again
-Expect the newly formed concept to fire
+A stimulus presented for t2
+Present the stimulus again
 """
 
-"""
-Test 3
-A stimulus presented shortly
-Don't expect the stimulus to converge
-or link correctly to the concepts presecribed by the stimulus
-"""
-
-"""
-Test 4
-A stimulus presented shortly
-Provide the stimulus again
-Expect the newly formed concept to fire
-"""

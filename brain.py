@@ -11,10 +11,10 @@ class Area():
         """
         self.n = int(n)
         self.p = p
-        self.connectome = binomial(1, self.p, size=(self.n, self.n))
+        self.connectome = binomial(1, self.p, size=(self.n, self.n)).astype(float)
 
 class Fiber():
-    def __init__(self, n, p, b):
+    def __init__(self, n, p, b, set_zero=True):
         """Brain Fiber
         n: number of neurons in each area
         p: probability of connections
@@ -22,20 +22,28 @@ class Fiber():
         self.n = int(n)
         self.p = p
         self.b = b
-        self.connectome = binomial(1, self.p, size=(self.n, self.n))
-    
-    def update_winners(self, winners):
-        self.winners = winners
+        self.connectome = binomial(1, self.p, size=(self.n, self.n)).astype(float)
+        self.from_winners = []
+        self.to_winners = []
 
-    def get_stimulus(self, winners):
-        activated = self.connectome(winners)
-        stimulus = np.sum(activated, axis=0)
+    def get_stimulus(self, key):
+        if key == 'from':
+            activated = self.connectome[:, self.to_winners]
+            stimulus = np.sum(activated, axis=1)
+        elif key == 'to':
+            activated = self.connectome[self.from_winners, :]
+            stimulus = np.sum(activated, axis=0)
         return stimulus
     
-    def update_weights(self, target_winners):
-        for i in self.winners:
-            for j in target_winners:
-                self.connectome[i][j] *= (1+self.b)
+    def update(self, new_winners, b, key):
+        if key == 'from':
+            self.from_winners = new_winners
+            if len(self.to_winners) != 0:
+                self.connectome[new_winners, self.to_winners] *= (1+b)
+        elif key == 'to':
+            self.to_winners = new_winners
+            if len(self.from_winners) != 0:
+                self.connectome[self.from_winners, new_winners] *= (1+b)
 
 class Concept(Area):
     def __init__(self, n, p, attribute='None'):
@@ -54,9 +62,12 @@ class Stimulus():
         self.n = int(n)
         self.p = p
         self.attribute = attribute
-        self.weights = binomial(self.k, self.p, self.n)
+        self.weights = binomial(self.k, self.p, self.n).astype(float)
         if set_zero:
             self.weights = np.zeros(self.n).astype(float)
+    
+    def update(self, new_winners, b):
+        self.weights[new_winners] *= (1+b)
 
 class Memory():
     def __init__(self, k, n, p, b, T):
@@ -77,29 +88,31 @@ class Memory():
     def add_concept(self, attribute, n_engrams):
         concept = Concept(self.n, self.p, attribute)
         self.concepts[attribute] = concept
+        stimulus = Stimulus(self.k, self.n, self.p)
         for _ in range(n_engrams):
-            stimulus = Stimulus(self.k, self.n, self.p)
             self.project(concept, stimulus)
         return concept
     
-    def project_single_step(self, winners, area, stimulus, area_stimulus=None):
+    def project_single_step(self, winners, area, stimulus=None, fiber_info=None):
+
+        fiber, key = None, None
+        if fiber_info is not None:
+            fiber, key = fiber_info
         # calculate inputs into each of n neurons
-        inputs = np.copy(stimulus.weights)
-        if area_stimulus is not None:
-            inputs = inputs + area_stimulus.weights
-        for i in winners:
-            for j in range(self.n):
-                inputs[j] += area.connectome[i][j]
+        inputs = np.zeros(self.n)
+        if stimulus is not None:
+            inputs += stimulus.weights
+        if fiber is not None:
+            inputs += inputs + fiber.get_stimulus(key)
+        inputs += np.sum(area.connectome[winners], axis=0)
         # identify top k winners 	
         new_winners = np.argsort(inputs)[-self.k:]
-        for i in new_winners:
-            stimulus.weights[i] *= (1+self.b)
-            if area_stimulus is not None:
-                area_stimulus.weights[i] *= (1+self.b)
-        # plasticity: for winners, for previous winners, update edge weight
-        for i in winners:
-            for j in new_winners:
-                area.connectome[i][j] *= (1+self.b)
+        if stimulus is not None:
+            stimulus.update(new_winners, self.b)
+        if fiber is not None:
+            fiber.update(new_winners, self.b, key)
+        if len(winners) != 0:
+            area.connectome[winners, new_winners] *= (1+self.b)
         return new_winners
 
     def project(self, area, stimulus):
@@ -114,22 +127,25 @@ class Memory():
         # print(logger.num_new_winners)
 
     def reciprocal_project(self, stimulus, wm_area, concept, time_step):
-
-        connectome_area_to_concept = Stimulus(self.n, self.n, self.p)
-        connectome_concept_to_area = Stimulus(self.n, self.n, self.p, set_zero=True)
+        
+        fiber = Fiber(self.n, self.p, self.b) # concept <-> area
         logger_area = ConvergenceLogger()
         logger_concept = ConvergenceLogger()
         wm_winners, concept_winners = [], []
 
         for t in range(time_step):
             new_wm_winners = self.project_single_step(
-                wm_winners, wm_area, stimulus, connectome_concept_to_area)
+                wm_winners, wm_area, stimulus, fiber_info=(fiber, 'to'))
+            fiber.to_winners = new_wm_winners
             new_concept_winners = self.project_single_step(
-                concept_winners, concept, connectome_area_to_concept)
+                concept_winners, concept, stimulus=None, fiber_info=(fiber, 'from'))
+            fiber.from_winners = new_concept_winners
+
             logger_area.update(new_wm_winners)
             logger_concept.update(new_concept_winners)
             wm_winners = new_wm_winners
             concept_winners = new_concept_winners
+
         print(logger_area.num_new_winners)
         print(logger_concept.num_new_winners)
         
