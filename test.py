@@ -1,20 +1,12 @@
 
 from brain import *
+import copy
 
 k = 1e2
 n = 1e4
 p = 0.1
 b = 0.1
 T = 10
-
-mem = Memory(k, n, p, b, T)
-mem.add_concept('Christos', 1)
-stimulus = Stimulus(k, n, p, attribute='Project')
-print('stimulate Project')
-mem.stimulate_WM(stimulus, 10)
-stimulus = Stimulus(k, n, p, attribute='Christos')
-print('stimulate Christos')
-mem.stimulate_WM(stimulus, 30)
 
 
 """
@@ -23,15 +15,20 @@ mem.stimulate_WM(stimulus, 30)
 3. assembly in Concept <-> Area'
 """
 
-"""
-Test 1
-A stimulus presented for t1
-Present the stimulus again
-"""
+def test_memorization_time(num_engrams, t_mem, t_recall):
+    mem = Memory(k, n, p, b, T)
+    mem.add_concept('Christos', num_engrams)
 
-"""
-Test 2
-A stimulus presented for t2
-Present the stimulus again
-"""
+    stimulus = Stimulus(k, n, p, attribute='Christos')
+    fiber = Fiber(n, p, b) # concept <-> area
+    fiber_copy = copy.deepcopy(fiber)
+    stimulus_copy = copy.deepcopy(stimulus)
+    concept_winners = mem.stimulate_WM(stimulus, fiber, t_mem)
+    new_concept_winners = mem.stimulate_WM(stimulus_copy, fiber_copy, t_recall)
+    intersection = np.intersect1d(concept_winners, new_concept_winners)
+    print(f'num_engrams={num_engrams}, t_mem={t_mem}, t_recall={t_recall}: {len(intersection)}')
 
+num_engrams = 5
+for t_mem in range(1, 21):
+    for t_recall in range(1, 21):
+        test_memorization_time(num_engrams=num_engrams, t_mem=t_mem, t_recall=t_recall)

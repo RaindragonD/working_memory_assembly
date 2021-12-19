@@ -126,9 +126,9 @@ class Memory():
             winners = new_winners
         # print(logger.num_new_winners)
 
-    def reciprocal_project(self, stimulus, wm_area, concept, time_step):
+    def reciprocal_project(self, stimulus, wm_area, concept, fiber, time_step):
         
-        fiber = Fiber(self.n, self.p, self.b) # concept <-> area
+        # fiber = Fiber(self.n, self.p, self.b) # concept <-> area
         logger_area = ConvergenceLogger()
         logger_concept = ConvergenceLogger()
         wm_winners, concept_winners = [], []
@@ -146,10 +146,9 @@ class Memory():
             wm_winners = new_wm_winners
             concept_winners = new_concept_winners
 
-        print(logger_area.num_new_winners)
-        print(logger_concept.num_new_winners)
+        return concept_winners
         
-    def stimulate_WM(self, stimulus, time_step):
+    def stimulate_WM(self, stimulus, fiber, time_step):
         """stimulate WM
         stimulus: Stimulus instance
         time_step: number of time steps
@@ -161,4 +160,5 @@ class Memory():
             return
         concept = self.concepts[stimulus.attribute]
         WM_area = Area(self.n, self.p)
-        self.reciprocal_project(stimulus, WM_area, concept, time_step)
+        concept_winners = self.reciprocal_project(stimulus, WM_area, concept, fiber, time_step)
+        return concept_winners
